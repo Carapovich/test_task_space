@@ -48,9 +48,11 @@ def run_simulation(sim_input: SimulationInput):
     state_lv = core.kepler2eci(sim_input.semi_major, sim_input.eccentricity, sim_input.inclination,
                                sim_input.long_ascend, sim_input.arg_periapsis, sim_input.mean_anomaly)
 
-    t_eval = np.linspace(start=0, stop=5000, num=50)
+    t_eval = np.linspace(start=0, stop=5000, num=100)
     result = integrator.solve_ivp(core.motion_equation_rhs,
                          t_span=(0, 5000),
                          y0=state_lv[:6],
                          t_eval=t_eval,
                          rtol=1e-7)
+
+    utils.show_anim(func_draw=utils.draw_state, func_arg=list(result.y.T))
