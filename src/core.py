@@ -1,14 +1,17 @@
 
 import numpy as np
+import numpy.linalg as la
 import sys
 
 from numpy.typing import NDArray
 from scipy.spatial.transform import Rotation as R
 
+EARTH_FM = 398600.4418e+9
+
+
+
 
 def kepler2eci(a, e, i, long, periapsis, m0) -> NDArray:
-    EARTH_FM = 398600.4418e+9
-
     # Расчет эксцентрической аномалии
     anom_e, d_anom_e = m0, 1.
     while np.abs(d_anom_e) >= 2 * sys.float_info.epsilon:
@@ -29,4 +32,16 @@ def kepler2eci(a, e, i, long, periapsis, m0) -> NDArray:
     r_i, v_i = rot_o2i.apply([r_o, v_o])
     a_i = -EARTH_FM * r_i / r_c**3
 
-    return np.vstack((r_i, v_i, a_i)).T
+    return np.hstack((r_i, v_i, a_i))
+
+def motion_equation_rhs(t, y_vecs: NDArray):
+    vec_r = y_vecs[:3]
+    vec_v = y_vecs[3:]
+
+    g_m = -EARTH_FM * vec_r / la.norm(vec_r)**3
+
+    dy_dt = np.zeros(y_vecs.size)
+    dy_dt[:3] = vec_v
+    dy_dt[3:] = g_m
+
+    return dy_dt

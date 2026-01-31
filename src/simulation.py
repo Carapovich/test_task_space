@@ -1,7 +1,8 @@
 
 import numpy as np
+import scipy.integrate as integrator
 
-import src.core as trans
+import src.core as core
 import src.utils as utils
 
 class SimulationInput:
@@ -44,7 +45,12 @@ class SimulationInput:
         )
 
 def run_simulation(sim_input: SimulationInput):
-    state_lv = trans.kepler2eci(sim_input.semi_major, sim_input.eccentricity, sim_input.inclination,
-                                sim_input.long_ascend, sim_input.arg_periapsis, sim_input.mean_anomaly)
+    state_lv = core.kepler2eci(sim_input.semi_major, sim_input.eccentricity, sim_input.inclination,
+                               sim_input.long_ascend, sim_input.arg_periapsis, sim_input.mean_anomaly)
 
-    utils.draw_state(state_lv[:, 0], state_lv[:, 1], state_lv[:, 2])
+    t_eval = np.linspace(start=0, stop=5000, num=50)
+    result = integrator.solve_ivp(core.motion_equation_rhs,
+                         t_span=(0, 5000),
+                         y0=state_lv[:6],
+                         t_eval=t_eval,
+                         rtol=1e-7)
