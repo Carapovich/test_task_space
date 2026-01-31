@@ -25,8 +25,8 @@ def kepler2eci(a, e, i, long, periapsis, m0) -> NDArray:
     v_o = np.sqrt(EARTH_FM * a) / r_c * np.array([ -np.sin(anom_e), np.sqrt(1 - e**2) * np.cos(anom_e), 0. ])
 
     # Радиус-вектор, вектор линейной скорости и ускорения тела в ИГЦСК
-    rot_o2i = R.from_euler('xyz', [periapsis, i, long])
+    rot_o2i = R.from_euler('zxz', [periapsis, i, long])
     r_i, v_i = rot_o2i.apply([r_o, v_o])
-    a_i = - EARTH_FM * r_i / r_c**3
+    a_i = -EARTH_FM * r_i / r_c**3
 
     return np.vstack((r_i, v_i, a_i)).T
