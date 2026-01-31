@@ -2,6 +2,7 @@ import csv
 
 import matplotlib.pyplot as plt
 import numpy as np
+import numpy.linalg as la
 
 def read_initial_conditions(filename) -> dict:
     with open(filename, mode='r', newline='') as file:
@@ -22,7 +23,7 @@ def draw_bias(axes, point, labels, mult = 1., dcm = None):
         axes.plot(*np.column_stack((point, bias_3d[:, i])), color=clr, linewidth=2)
         axes.text(*bias_3d[:, i], lbl)
 
-def show_bias_in_ecef(dcm_body2ecef):
+def draw_state(r_eci, v_eci, a_eci):
     # Настройка окна с plot3d
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
@@ -35,6 +36,9 @@ def show_bias_in_ecef(dcm_body2ecef):
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
 
-    draw_bias(ax, (0, 0, 0), (r'$x_B$', r'$y_B$', r'$z_B$'), 1.4, dcm_body2ecef)
-    draw_bias(ax, (-2, -2, -2), (r'$x_W$', r'$y_W$', r'$z_W$'))
+    draw_bias(ax, (0, 0, 0), (r'$x_B$', r'$y_B$', r'$z_B$'), 1.4)
+    ax.quiver(0, 0, 0, *(r_eci/la.norm(r_eci)), color='black')
+    ax.quiver(*(r_eci / la.norm(r_eci)), *(v_eci / la.norm(v_eci)), color='red')
+    ax.quiver(*(r_eci / la.norm(r_eci)), *(a_eci / la.norm(a_eci)), color='green')
+
     plt.show()

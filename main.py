@@ -6,8 +6,9 @@
 
 import argparse
 
+import src.simulation as core
 import src.utils as utils
-import src.core as core
+
 # from .src.model_motion import ModelMotion
 
 def parse_arguments():
@@ -26,6 +27,7 @@ def main():
     input_dict = utils.read_initial_conditions(args.input)
 
     sim_input = core.SimulationInput.from_dict(input_dict)
+    core.run_simulation(sim_input)
 
     return 0
 
