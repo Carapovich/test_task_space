@@ -24,8 +24,8 @@ def draw_bias(axes, point, labels, mult = 1., dcm = None):
     bias_3d += point
 
     for i, (clr, lbl) in enumerate(zip(('r', 'g', 'b'), labels)):
-        axes.plot(*np.column_stack((point, bias_3d[:, i])), color=clr, linewidth=2)
-        axes.text(*bias_3d[:, i], lbl, fontsize=12)
+        axes.plot(*np.column_stack((point, bias_3d[i, :])), color=clr, linewidth=2)
+        axes.text(*bias_3d[i, :], lbl, fontsize=12)
 
 def draw_state(axes, rv_vecs):
     if not hasattr(draw_state, 'xyz_lim'):
