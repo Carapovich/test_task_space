@@ -31,30 +31,43 @@ def kepler2eci(a, e, i, long, periapsis, m0) -> NDArray:
     rot_o2i = R.from_euler('zxz', [periapsis, i, long])
     r_i, v_i = rot_o2i.apply([r_o, v_o])
 
-    return np.hstack((r_i, v_i))
+    return np.vstack( (r_i, v_i) )
 
 def get_state_relative(src_state, distance, yaw, pitch):
-    vec_r = src_state[:3]
-    vec_v = src_state[3:]
+    vec_r, vec_v = src_state
 
     e_x, e_y = vec_v / la.norm(vec_v), -vec_r / la.norm(vec_r)
     e_z = la.cross(e_x, e_y)
 
     rot_yaw = R.from_rotvec(-yaw * e_z)
     rot_pitch = R.from_rotvec(pitch * rot_yaw.apply(e_x))
-    v_bias = (rot_pitch * rot_yaw).apply(e_y) * distance
+    e_result = (rot_pitch * rot_yaw).apply(e_y)
 
-    return np.hstack((vec_r + v_bias, vec_v))
+    return e_result, np.vstack( (vec_r + e_result * distance, vec_v) )
 
+def motion_equation_rhs(t, y_vecs: np.ndarray, *constants) -> np.ndarray:
+    if not hasattr(motion_equation_rhs, 'decoupling'):
+        motion_equation_rhs.decoupling = False
 
-def motion_equation_rhs(t, y_vecs: NDArray):
-    vec_r = y_vecs[:3]
-    vec_v = y_vecs[3:]
+    lv_r, lv_v, sc_r, sc_v = np.split(y_vecs, 4)
+    spring, lv_m, sc_m, e_lv2sc = constants
 
-    g_m = -EARTH_FM * vec_r / la.norm(vec_r)**3
+    # Расчет длины пружины
+    delta_x = la.norm(lv_r - sc_r)
+    if not motion_equation_rhs.decoupling and delta_x >= spring["l1"]:
+        motion_equation_rhs.decoupling = True
 
-    dy_dt = np.zeros(y_vecs.size)
-    dy_dt[:3] = vec_v
-    dy_dt[3:] = g_m
+    # Ускорения от пружины
+    lv_s_a, sc_s_a = np.zeros(3, dtype=float), np.zeros(3, dtype=float)
+    if not motion_equation_rhs.decoupling:
+        lv_s_a = -e_lv2sc * spring["k"] / lv_m * (spring["l0"] - delta_x)
+        sc_s_a = +e_lv2sc * spring["k"] / sc_m * (spring["l0"] - delta_x)
+
+    # Гравитационное ускорение
+    lv_gm = -EARTH_FM * lv_r / la.norm(lv_r)**3
+    sc_gm = -EARTH_FM * sc_r / la.norm(sc_r)**3
+
+    # Составление правых частей
+    dy_dt = np.hstack((lv_v, lv_gm + lv_s_a, sc_v, sc_gm + sc_s_a))
 
     return dy_dt

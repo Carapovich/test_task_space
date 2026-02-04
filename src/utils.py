@@ -7,6 +7,7 @@ import numpy.linalg as la
 
 from matplotlib.animation import FuncAnimation
 from matplotlib.artist import Artist
+from mpl_toolkits.mplot3d import Axes3D
 
 def read_initial_conditions(filename) -> dict:
     with open(filename, mode='r', newline='') as file:
@@ -49,29 +50,31 @@ def draw_state(axes, rv_vecs):
 
     plt.draw()
 
-def draw_together(axes, rv_vecs: list[np.ndarray]):
-    v1_r, v1_v = np.hsplit(rv_vecs[0], 2)
-    v2_r, v2_v = np.hsplit(rv_vecs[1], 2)
+def draw_together(axes: Axes3D, rv_vecs: np.ndarray):
+    v1_r, v1_v, v2_r, v2_v = rv_vecs
 
-    lim_left, lim_right = np.min((v1_r, v2_r), axis=0) - 1., np.max((v1_r, v2_r), axis=0) + 1.
-    bias_scale = la.norm((lim_right - lim_left) * 0.25)
+    lim_l, lim_r = np.min((v1_r, v2_r), axis=0), np.max((v1_r, v2_r), axis=0)
+    center = lim_l + 0.5 * (lim_r - lim_l)
+    if not hasattr(draw_together, 'lim_diff'):
+        draw_together.lim_diff = np.max(lim_r - lim_l)
+    lim_l, lim_r = center - 10 * draw_together.lim_diff, center + 10 * draw_together.lim_diff
 
     # Настройка графика
-    axes.set_xlim([lim_left[0], lim_right[0]])
-    axes.set_ylim([lim_left[1], lim_right[1]])
-    axes.set_zlim([lim_left[2], lim_right[2]])
+    axes.set_xlim([lim_l[0], lim_r[0]])
+    axes.set_ylim([lim_l[1], lim_r[1]])
+    axes.set_zlim([lim_l[2], lim_r[2]])
     axes.set_box_aspect([1, 1, 1])
     axes.set_xlabel('X, m')
     axes.set_ylabel('Y, m')
     axes.set_zlabel('Z, m')
 
-    draw_bias(axes, lim_left + 0.2, (r'$\gamma$', r'$y_I$', r'$z_I$'), bias_scale)
+    draw_bias(axes, lim_l + 0.1 * draw_together.lim_diff, (r'$\gamma$', r'$y_I$', r'$z_I$'), 4 * draw_together.lim_diff)
     axes.scatter(*v1_r, color='black')
-    axes.quiver(*v1_r, *(-v1_r / la.norm(v1_r)), color='black')
-    axes.quiver(*v1_r, *(v1_v / la.norm(v1_v)), color='red')
+    axes.quiver(*v1_r, *(2 * draw_together.lim_diff * -v1_r / la.norm(v1_r)), color='black')
+    axes.quiver(*v1_r, *(2 * draw_together.lim_diff * v1_v / la.norm(v1_v)), color='red')
     axes.scatter(*v2_r, color='brown')
-    axes.quiver(*v2_r, *(-v2_r / la.norm(v2_r)), color='black')
-    axes.quiver(*v2_r, *(v2_v / la.norm(v2_v)), color='red')
+    axes.quiver(*v2_r, *(2 * draw_together.lim_diff * -v2_r / la.norm(v2_r)), color='black')
+    axes.quiver(*v2_r, *(2 * draw_together.lim_diff * v2_v / la.norm(v2_v)), color='red')
 
 def show_anim(func_draw: Callable, func_arg: list):
     if not hasattr(show_anim, 'fig'):
@@ -79,9 +82,11 @@ def show_anim(func_draw: Callable, func_arg: list):
     if not hasattr(show_anim, 'axes'):
         show_anim.axes = show_anim.fig.add_subplot(111, projection='3d')
 
+    show_anim.fig.tight_layout()
     total_frames = len(func_arg)
 
     def anim_update(frame) -> Iterable[Artist]:
+        show_anim.axes.clear()
         func_draw(show_anim.axes, func_arg[frame])
         if frame == total_frames - 1:
             anim.event_source.stop()

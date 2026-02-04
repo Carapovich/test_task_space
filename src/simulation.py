@@ -1,4 +1,5 @@
 
+import sys
 import numpy as np
 import scipy.integrate as integrator
 
@@ -45,14 +46,22 @@ class SimulationInput:
         )
 
 def run_simulation(sim_input: SimulationInput):
+    # Задание положения РН по кеплеровым элементам орбиты
     state_lv = core.kepler2eci(sim_input.semi_major, sim_input.eccentricity, sim_input.inclination,
                                sim_input.long_ascend, sim_input.arg_periapsis, sim_input.mean_anomaly)
+    # Задание положения КА относительно положения РН
+    e_lv2sc, state_sc = core.get_state_relative(state_lv, sim_input.spring_l2,
+                                                sim_input.start_yaw, sim_input.start_pitch)
 
-    t_eval = np.linspace(start=0, stop=5000, num=100)
+    # Настройка параметров и расчет решения системы ДУ движения
+    spring: dict = {"k": sim_input.spring_stiffness, "l0": sim_input.spring_l0, "l1": sim_input.spring_l1}
+    t_eval = np.linspace(start=0, stop=sim_input.sim_time, num=int(100 * sim_input.sim_time))
     result = integrator.solve_ivp(core.motion_equation_rhs,
-                         t_span=(0, 5000),
-                         y0=state_lv[:6],
-                         t_eval=t_eval,
-                         rtol=1e-7)
+                                  t_span=(0, sim_input.sim_time),
+                                  y0=np.vstack((state_lv, state_sc)).ravel(),
+                                  t_eval=t_eval,
+                                  rtol=1e2*sys.float_info.epsilon,
+                                  args=(spring, sim_input.mass_lv, sim_input.mass_sc, e_lv2sc))
 
-    utils.show_anim(func_draw=utils.draw_state, func_arg=list(result.y.T))
+    y_vecs = result.y.T.reshape(-1, 4, 3)
+    utils.show_anim(func_draw=utils.draw_together, func_arg=list(y_vecs))
