@@ -39,9 +39,9 @@ def get_state_relative(src_state, distance, yaw, pitch):
     e_x, e_y = vec_v / la.norm(vec_v), -vec_r / la.norm(vec_r)
     e_z = la.cross(e_x, e_y)
 
-    rot_yaw = R.from_rotvec(-yaw * e_z)
-    rot_pitch = R.from_rotvec(pitch * rot_yaw.apply(e_x))
-    e_result = (rot_pitch * rot_yaw).apply(e_y)
+    rot_yaw = R.from_rotvec(yaw * e_z)
+    rot_pitch = R.from_rotvec(-pitch * rot_yaw.apply(e_y))
+    e_result = (rot_pitch * rot_yaw).apply(e_x)
 
     return e_result, np.vstack( (vec_r + e_result * distance, vec_v) )
 
