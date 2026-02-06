@@ -64,7 +64,60 @@ def run_simulation(sim_input: SimulationInput) -> tuple:
                                   events=core.event_decoupling,
                                   args=(spring, sim_input.mass_lv, sim_input.mass_sc, e_lv2sc))
 
-    return t_eval, result.y, result.t_events[0]
+    # Дополнительный расчет силы пружинного толкателя
+    rel_r = la.norm(result.y[:3, :] - result.y[6:9, :], axis=0)
+    dx = np.where(rel_r >= spring['l1'], spring['l0'], rel_r)
+    stiff_force = spring["k"] * (spring["l0"] - dx)
+
+    return t_eval, result.y, stiff_force, result.t_events[0][0]
+
 
 def process_result(sim_result: tuple):
-    pass
+    t, y, stiff_force, t_decoupling = sim_result
+    lv_r, lv_v, sc_r, sc_v = np.vsplit(y, 4)
+
+    # Линейная экстраполяция для получения референсных прямых для проекций вектора скорости
+    i0 = np.argwhere(t > 2 * t_decoupling).ravel()[0]
+    ref_lv_v = np.stack((lv_v[:, i0] - (lv_v[:, -1] - lv_v[:, i0]) / (t[-1] - t[i0]) * t[i0], lv_v[:, i0])).T
+    ref_sc_v = np.stack((sc_v[:, i0] - (sc_v[:, -1] - sc_v[:, i0]) / (t[-1] - t[i0]) * t[i0], sc_v[:, i0])).T
+    ref_t = t[[0, i0]]
+
+    # Графики радиус-вектора и вектора скорости для РН
+    utils.plot_vector(t, lv_r,
+                      'Проекции радиус-вектора РН в ECI J2000',
+                      (r'Проекция $\bf r\it_x$', r'Проекция $\bf r\it_y$', r'Проекция $\bf r\it_z$'),
+                      (r'$\bf r\it_x^I$, метры', r'$\bf r\it_y^I$, метры', r'$\bf r\it_z^I$, метры'))
+    utils.plot_vector_with_ref_line(t[:i0 + 1], lv_v[:, :i0 + 1], ref_t, ref_lv_v,
+                                    'Проекции вектора скорости РН в ECI J2000 во время расстыковки',
+                                    (r'Проекция $\bf v\it_x$', r'Проекция $\bf v\it_y$', r'Проекция $\bf v\it_z$'),
+                                    (r'$\bf v\it_x^I$, м/сек', r'$\bf v\it_y^I$, м/сек', r'$\bf v\it_z^I$, м/сек'))
+    utils.plot_vector(t, lv_v,
+                      'Проекции вектора скорости РН в ECI J2000',
+                      (r'Проекция $\bf v\it_x$', r'Проекция $\bf v\it_y$', r'Проекция $\bf v\it_z$'),
+                      (r'$\bf v\it_x^I$, м/сек', r'$\bf v\it_y^I$, м/сек', r'$\bf v\it_z^I$, м/сек'))
+
+    # Графики радиус-вектора и вектора скорости для КА
+    utils.plot_vector(t, sc_r,
+                      'Проекции радиус-вектора КА в ECI J2000',
+                      (r'Проекция $\bf r\it_x$', r'Проекция $\bf r\it_y$', r'Проекция $\bf r\it_z$'),
+                      (r'$\bf r\it_x^I$, метры', r'$\bf r\it_y^I$, метры', r'$\bf r\it_z^I$, метры'))
+    utils.plot_vector_with_ref_line(t[:i0 + 1], sc_v[:, :i0 + 1], ref_t, ref_sc_v,
+                                    'Проекции вектора скорости КА в ECI J2000 во время расстыковки',
+                                    (r'Проекция $\bf v\it_x$', r'Проекция $\bf v\it_y$', r'Проекция $\bf v\it_z$'),
+                                    (r'$\bf v\it_x^I$, м/сек', r'$\bf v\it_y^I$, м/сек', r'$\bf v\it_z^I$, м/сек'))
+    utils.plot_vector(t, sc_v,
+                      'Проекции вектора скорости КА в ECI J2000',
+                      (r'Проекция $\bf v\it_x$', r'Проекция $\bf v\it_y$', r'Проекция $\bf v\it_z$'),
+                      (r'$\bf v\it_x^I$, м/сек', r'$\bf v\it_y^I$, м/сек', r'$\bf v\it_z^I$, м/сек'))
+
+    # Графики отн. расстояния и скорости, а также силы пружинного толкателя
+    rel_r = la.norm(lv_r - sc_r, axis=0)
+    rel_v = la.norm(lv_v - sc_v, axis=0)
+
+    utils.plot_vector(t[:i0 + 1], np.vstack((rel_r, rel_v, stiff_force))[:, :i0 + 1],
+                      'Относительное расстояние, скорость и сила пружинного толкателя',
+                      ('Относительное расстояние', 'Относительная скорость', 'Сила пружинного толкателя'),
+                      (r'$\bf |r|\it_{отн}$, метры', r'$\bf |v|\it_{отн}$, м/сек', r'$\bf F\it_{упр}$, Н'),
+                      subplot_order=(3, 1), single_scale_y=False)
+
+    plt.show()
