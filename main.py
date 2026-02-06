@@ -6,10 +6,8 @@
 
 import argparse
 
-import src.simulation as core
+import src.simulation as sim
 import src.utils as utils
-
-# from .src.model_motion import ModelMotion
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Моделирование движения материальных точек')
@@ -25,9 +23,11 @@ def parse_arguments():
 def main():
     args = parse_arguments()
     input_dict = utils.read_initial_conditions(args.input)
+    sim_input = sim.SimulationInput.from_dict(input_dict)
 
-    sim_input = core.SimulationInput.from_dict(input_dict)
-    core.run_simulation(sim_input)
+    sim_result = sim.run_simulation(sim_input)
+
+    sim.process_result(sim_result)
 
     return 0
 

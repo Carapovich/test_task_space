@@ -3,15 +3,11 @@ import numpy as np
 import numpy.linalg as la
 import sys
 
-from numpy.typing import NDArray
 from scipy.spatial.transform import Rotation as R
 
 EARTH_FM = 398600.4418e+9
 
-
-
-
-def kepler2eci(a, e, i, long, periapsis, m0) -> NDArray:
+def kepler2eci(a, e, i, long, periapsis, m0) -> np.ndarray:
     # Расчет эксцентрической аномалии
     anom_e, d_anom_e = m0, 1.
     while np.abs(d_anom_e) >= 2 * sys.float_info.epsilon:
@@ -44,6 +40,12 @@ def get_state_relative(src_state, distance, yaw, pitch):
     e_result = (rot_pitch * rot_yaw).apply(e_x)
 
     return e_result, np.vstack( (vec_r + e_result * distance, vec_v) )
+
+def event_decoupling(t, y_vecs: np.ndarray, *constants):
+    lv_r, _, sc_r, _ = np.split(y_vecs, 4)
+    spring, _, _, _ = constants
+
+    return la.norm(lv_r - sc_r) < spring["l1"]
 
 def motion_equation_rhs(t, y_vecs: np.ndarray, *constants) -> np.ndarray:
     if not hasattr(motion_equation_rhs, 'decoupling'):

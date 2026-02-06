@@ -45,7 +45,7 @@ class SimulationInput:
             sim_time=d['sim time']
         )
 
-def run_simulation(sim_input: SimulationInput):
+def run_simulation(sim_input: SimulationInput) -> tuple:
     # Задание положения РН по кеплеровым элементам орбиты
     state_lv = core.kepler2eci(sim_input.semi_major, sim_input.eccentricity, sim_input.inclination,
                                sim_input.long_ascend, sim_input.arg_periapsis, sim_input.mean_anomaly)
@@ -55,13 +55,16 @@ def run_simulation(sim_input: SimulationInput):
 
     # Настройка параметров и расчет решения системы ДУ движения
     spring: dict = {"k": sim_input.spring_stiffness, "l0": sim_input.spring_l0, "l1": sim_input.spring_l1}
-    t_eval = np.linspace(start=0, stop=sim_input.sim_time, num=int(100 * sim_input.sim_time))
+    t_eval = np.linspace(start=0, stop=sim_input.sim_time, num=int(100 * sim_input.sim_time + 1))
     result = integrator.solve_ivp(core.motion_equation_rhs,
                                   t_span=(0, sim_input.sim_time),
                                   y0=np.vstack((state_lv, state_sc)).ravel(),
                                   t_eval=t_eval,
                                   rtol=1e2*sys.float_info.epsilon,
+                                  events=core.event_decoupling,
                                   args=(spring, sim_input.mass_lv, sim_input.mass_sc, e_lv2sc))
 
-    y_vecs = result.y.T.reshape(-1, 4, 3)
-    utils.show_anim(func_draw=utils.draw_together, func_arg=list(y_vecs))
+    return t_eval, result.y, result.t_events[0]
+
+def process_result(sim_result: tuple):
+    pass
