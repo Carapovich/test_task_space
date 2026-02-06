@@ -54,12 +54,12 @@ def motion_equation_rhs(t, y_vecs: np.ndarray, *constants) -> np.ndarray:
 
     # Расчет длины пружины
     delta_x = la.norm(lv_r - sc_r)
-    if not motion_equation_rhs.decoupling and delta_x >= spring["l1"]:
+    if not motion_equation_rhs.decoupling and delta_x >= 2 * spring["l1"]:
         motion_equation_rhs.decoupling = True
 
     # Ускорения от пружины
     lv_s_a, sc_s_a = np.zeros(3, dtype=float), np.zeros(3, dtype=float)
-    if not motion_equation_rhs.decoupling:
+    if not motion_equation_rhs.decoupling and delta_x < spring["l1"]:
         lv_s_a = -e_lv2sc * spring["k"] / lv_m * (spring["l0"] - delta_x)
         sc_s_a = +e_lv2sc * spring["k"] / sc_m * (spring["l0"] - delta_x)
 
