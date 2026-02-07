@@ -121,4 +121,9 @@ def process_result(sim_result: tuple):
                       (r'$\bf |r|\it_{отн}$, метры', r'$\bf |v|\it_{отн}$, м/сек', r'$\bf F\it_{упр}$, Н'),
                       subplot_order=(3, 1), single_scale_y=False)
 
+    # Пространственный график траектории
+    fig = plt.figure(num='Траектории РН и КА в пространстве')
+    utils.plot_vehicles_trajectory(fig, t, y)
+    fig.tight_layout()
+
     plt.show()
