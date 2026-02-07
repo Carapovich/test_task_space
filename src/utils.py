@@ -19,37 +19,46 @@ def read_initial_conditions(filename) -> dict:
     return ic_dict
 
 
-def plot_vector(time: np.ndarray, vector_data: np.ndarray,
+def plot_vector(time: np.ndarray, vector_data,
                 plot_name: str, titles: tuple, y_labels: tuple,
-                subplot_order=(1, 3), single_scale_y=True, add_plotting: Callable=None, args=None):
+                subplot_order=None, single_scale_y=True, add_plotting: Callable=None, args=None):
 
     fig = plt.figure(num=plot_name)
     fig.suptitle(plot_name)
     plt.subplots_adjust(wspace=0.3, hspace=0.4)
 
-    diff_lim, cntr = 0, 0
-    if single_scale_y:
-        diff_lim = max(np.max(vector_data, axis=1) - np.min(vector_data, axis=1)) / 1.95
-        cntr = np.mean(vector_data, axis=1)
+    if not isinstance(vector_data, list):
+        vector_data = [vector_data]
+    if subplot_order is None:
+        subplot_order = (len(vector_data), 3)
 
-    for i, clr in enumerate(("r", "g", "b")):
-        axes = fig.add_subplot(*subplot_order, i + 1)
-        axes.plot(time, vector_data[i, :], color=clr, linewidth=2)
-        axes.grid(True, which='both', linestyle='--')
-        axes.set(xlabel='t, сек', ylabel=y_labels[i], title=titles[i])
-
+    for i, vector in enumerate(vector_data):
+        diff_lim, cntr = 0, 0
         if single_scale_y:
-            axes.set_ylim((cntr[i] - diff_lim, cntr[i] + diff_lim))
-        if add_plotting is not None:
-            add_plotting(axes, i, *args)
+            diff_lim = max(np.max(vector, axis=1) - np.min(vector, axis=1)) / 1.95
+            cntr = np.mean(vector, axis=1)
+
+        for j, clr in enumerate(("r", "g", "b")):
+            axes = fig.add_subplot(*subplot_order, 3 * i + j + 1)
+            axes.plot(time, vector[j, :], color=clr, linewidth=2)
+            axes.grid(True, which='both', linestyle='--')
+            axes.set(xlabel='t, сек', ylabel=y_labels[3 * i + j], title=titles[3 * i + j])
+
+            if single_scale_y:
+                axes.set_ylim((cntr[j] - diff_lim, cntr[j] + diff_lim))
+            if add_plotting is not None:
+                add_plotting(axes, i, j, *args)
 
 
-def plot_vector_with_ref_line(time: np.ndarray, vector_data: np.ndarray, ref_t: np.ndarray, ref_y: np.ndarray,
+def plot_vector_with_ref_line(time: np.ndarray, vector_data: list[np.ndarray], ref_t: np.ndarray, ref_y,
                               plot_name: str, titles: tuple, y_labels: tuple):
 
-    def plot_ref_line(axes, i: int, t, y):
-        axes.plot(t, y[i, :], ls='--', color='black', linewidth=1, zorder=0)
-        axes.legend(('Опорная прямая', titles[i]))
+    def plot_ref_line(axes, i, j, t, y):
+        axes.plot(t, y[i][j, :], ls='--', color='black', linewidth=1, zorder=0)
+        axes.legend(('Опорная прямая', titles[3 * i + j]))
+
+    if not isinstance(ref_y, list):
+        ref_y = [ref_y]
 
     plot_vector(time, vector_data, plot_name, titles, y_labels, add_plotting=plot_ref_line, args=(ref_t, ref_y))
 
