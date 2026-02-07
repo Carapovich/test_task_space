@@ -7,6 +7,7 @@ import numpy.linalg as la
 
 from matplotlib.animation import FuncAnimation
 from matplotlib.artist import Artist
+from matplotlib.figure import Figure
 from mpl_toolkits.mplot3d import Axes3D
 
 def read_initial_conditions(filename) -> dict:
@@ -17,6 +18,18 @@ def read_initial_conditions(filename) -> dict:
             ic_dict.update({ row[0]: float(row[1]) })
 
     return ic_dict
+
+
+def get_with_length(vector: np.ndarray, length: float) -> np.ndarray:
+    return vector / la.norm(vector) * length
+
+
+# Определение пределов и геометрического центра области траекторий объектов
+def get_geom_anchors(vectors: np.ndarray) -> tuple:
+    v_max, v_min = np.max(vectors, axis=1), np.min(vectors, axis=1)
+    d_lims = v_max - v_min
+
+    return v_max, v_min, d_lims / 1.9, max(d_lims), v_min + d_lims / 2.
 
 
 def plot_vector(time: np.ndarray, vector_data,
@@ -63,17 +76,76 @@ def plot_vector_with_ref_line(time: np.ndarray, vector_data: list[np.ndarray], r
     plot_vector(time, vector_data, plot_name, titles, y_labels, add_plotting=plot_ref_line, args=(ref_t, ref_y))
 
 
-def draw_bias(axes, point, labels, mult = 1., dcm = None):
+def draw_bias(axes, point, labels, mult = 1.):
     bias_3d = np.identity(3) * mult
-    if dcm is not None:
-        bias_3d = np.dot(dcm, bias_3d)
     bias_3d += point
 
     for i, (clr, lbl) in enumerate(zip(('r', 'g', 'b'), labels)):
         axes.plot(*np.column_stack((point, bias_3d[i, :])), color=clr, linewidth=2)
         axes.text(*bias_3d[i, :], lbl, fontsize=12)
 
-def draw_state(axes, rv_vecs):
+
+def plot_vehicles_trajectory(figure: Figure, t: np.ndarray, vehicles_vectors: np.ndarray, frame=None):
+    v1_r, v1_v, v2_r, v2_v = np.vsplit(vehicles_vectors, 4)
+
+    if frame is None:
+        frame = v1_r.shape[1] - 1
+
+    if not hasattr(plot_vehicles_trajectory, 'figures_gnrl'):
+        v_max, v_min, d_lims, d_lim_max, cntr = get_geom_anchors(np.hstack((v1_r, v2_r)))
+
+        # Создание и настройка графика общего вида траектории
+        axes_gnrl = figure.add_subplot(1, 2, 1, projection='3d')
+        axes_gnrl.set(
+            title='Общий вид траектории',
+            xlim=(cntr[0] - d_lims[0], cntr[0] + d_lims[0]),
+            ylim=(cntr[1] - d_lims[1], cntr[1] + d_lims[1]),
+            zlim=(cntr[2] - d_lims[2], cntr[2] + d_lims[2]),
+            box_aspect=(v_max - v_min) / d_lim_max, xlabel='X, метры', ylabel='Y, метры', zlabel='Z, метры')
+        draw_bias(axes_gnrl, v_min + 1e-3 * d_lim_max, (r'$x_I$', r'$y_I$', r'$z_I$'), 0.05 * d_lim_max)
+
+        plot_vehicles_trajectory.figures_gnrl = [
+            axes_gnrl.plot(*(v1_r[:, 0]), color='k', linestyle='--', label='Траектория РН')[0],
+            axes_gnrl.plot(*(v2_r[:, 0]), color='r', linestyle=':', label='Траектория КА')[0],
+            axes_gnrl.scatter(*(v1_r[:, 0]), color='k'), axes_gnrl.scatter(*(v2_r[:, 0]), color='r')]
+        axes_gnrl.legend(handles=plot_vehicles_trajectory.figures_gnrl[:2])
+
+        # Создание графика приближенного вида траектории
+        plot_vehicles_trajectory.axes_clsup = figure.add_subplot(1, 2, 2, projection='3d')
+        plot_vehicles_trajectory.d_lim = np.max(abs(v1_r - v2_r)) / 1.9
+
+    # Отрисовываем график общего вида
+    traj1, traj2, p1, p2 = plot_vehicles_trajectory.figures_gnrl
+    traj1.set_data_3d(*(v1_r[:, :frame + 1]))
+    traj2.set_data_3d(*(v2_r[:, :frame + 1]))
+    p1._offsets3d = tuple(np.split(v1_r[:, frame], 3))
+    p2._offsets3d = tuple(np.split(v2_r[:, frame], 3))
+
+    # Отрисовываем график приближенного вида
+    d_lim = plot_vehicles_trajectory.d_lim
+    v1_r, v1_v, v2_r, v2_v = np.split(vehicles_vectors[:, frame], 4)
+    _, v_min, _, _, cntr = get_geom_anchors(np.vstack((v1_r, v2_r)).T)
+
+    axes = plot_vehicles_trajectory.axes_clsup
+    axes.clear()
+    axes.set(
+        title=rf'Приближенный вид траектории, t={t[frame]:.2f} сек.',
+        xlim=(cntr[0] - d_lim, cntr[0] + d_lim),
+        ylim=(cntr[1] - d_lim, cntr[1] + d_lim),
+        zlim=(cntr[2] - d_lim, cntr[2] + d_lim),
+        box_aspect=(1, 1, 1), xlabel='X, метры', ylabel='Y, метры', zlabel='Z, метры')
+
+    draw_bias(axes, cntr - 0.95 * d_lim, (r'$x_I$', r'$y_I$', r'$z_I$'), 0.2 * d_lim)
+    axes.scatter(*v1_r, color='k', marker='*', s=50)
+    axes.text(*(v1_r + 1e-2 * d_lim), s='РН')
+    axes.scatter(*v2_r, color='r', marker='*', s=50)
+    axes.text(*(v2_r + 1e-2 * d_lim), s='КА')
+    axes.quiver(*v1_r, *get_with_length(v1_v, 0.2 * d_lim), color='b')
+    axes.text(*(v1_r + get_with_length(v1_v, 0.2 * d_lim) + 1e-2 * d_lim), s=rf'$\bf |v|$={la.norm(v1_v):.2f} м/с')
+    axes.quiver(*v2_r, *get_with_length(v2_v, 0.2 * d_lim), color='b')
+    axes.text(*(v2_r + get_with_length(v2_v, 0.2 * d_lim) + 1e-2 * d_lim), s=rf'$\bf |v|$={la.norm(v2_v):.2f} м/с')
+
+def draw_state(axes: Axes3D, rv_vecs: np.ndarray):
     if not hasattr(draw_state, 'xyz_lim'):
         draw_state.xyz_lim = float( la.norm(rv_vecs[:3]) / 1e6 )
 
