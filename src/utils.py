@@ -146,54 +146,6 @@ def plot_vehicles_trajectory(figure: Figure, t: np.ndarray, vehicles_vectors: np
     axes.quiver(*v2_r, *get_with_length(v2_v, 0.2 * d_lim), color='b')
     axes.text(*(v2_r + get_with_length(v2_v, 0.2 * d_lim) + 1e-2 * d_lim), s=rf'$\bf |v|$={la.norm(v2_v):.2f} м/с')
 
-def draw_state(axes: Axes3D, rv_vecs: np.ndarray):
-    if not hasattr(draw_state, 'xyz_lim'):
-        draw_state.xyz_lim = float( la.norm(rv_vecs[:3]) / 1e6 )
-
-    # Очистка и настройка графика
-    # axes.clear()
-    axes.set_xlim([-2 * draw_state.xyz_lim, 2 * draw_state.xyz_lim])
-    axes.set_ylim([-2 * draw_state.xyz_lim, 2 * draw_state.xyz_lim])
-    axes.set_zlim([-2 * draw_state.xyz_lim, 2 * draw_state.xyz_lim])
-    axes.set_box_aspect([1, 1, 1])
-    axes.set_xlabel(r'X, km$\times 10^3$')
-    axes.set_ylabel(r'Y, km$\times 10^3$')
-    axes.set_zlabel(r'Z, km$\times 10^3$')
-
-    vec_r, vec_v = np.hsplit(rv_vecs, 2)
-
-    draw_bias(axes, (0, 0, 0), (r'$\gamma$', r'$y_I$', r'$z_I$'), 1.4 * draw_state.xyz_lim)
-    axes.quiver(0, 0, 0, *(vec_r / 1e6 ), color='black')
-    axes.quiver(*(vec_r / 1e6 ), *(vec_v / 1e4), color='red')
-
-    plt.draw()
-
-def draw_together(axes: Axes3D, rv_vecs: np.ndarray):
-    v1_r, v1_v, v2_r, v2_v = rv_vecs
-
-    lim_l, lim_r = np.min((v1_r, v2_r), axis=0), np.max((v1_r, v2_r), axis=0)
-    center = lim_l + 0.5 * (lim_r - lim_l)
-    if not hasattr(draw_together, 'lim_diff'):
-        draw_together.lim_diff = np.max(lim_r - lim_l)
-    lim_l, lim_r = center - 10 * draw_together.lim_diff, center + 10 * draw_together.lim_diff
-
-    # Настройка графика
-    axes.set_xlim([lim_l[0], lim_r[0]])
-    axes.set_ylim([lim_l[1], lim_r[1]])
-    axes.set_zlim([lim_l[2], lim_r[2]])
-    axes.set_box_aspect([1, 1, 1])
-    axes.set_xlabel('X, m')
-    axes.set_ylabel('Y, m')
-    axes.set_zlabel('Z, m')
-
-    draw_bias(axes, lim_l + 0.1 * draw_together.lim_diff, (r'$\gamma$', r'$y_I$', r'$z_I$'), 4 * draw_together.lim_diff)
-    axes.scatter(*v1_r, color='black')
-    axes.quiver(*v1_r, *(2 * draw_together.lim_diff * -v1_r / la.norm(v1_r)), color='black')
-    axes.quiver(*v1_r, *(2 * draw_together.lim_diff * v1_v / la.norm(v1_v)), color='red')
-    axes.scatter(*v2_r, color='brown')
-    axes.quiver(*v2_r, *(2 * draw_together.lim_diff * -v2_r / la.norm(v2_r)), color='black')
-    axes.quiver(*v2_r, *(2 * draw_together.lim_diff * v2_v / la.norm(v2_v)), color='red')
-
 
 def show_anim(figure: Figure, func_draw: Callable, frame_hz, t, y):
     anim = FuncAnimation
