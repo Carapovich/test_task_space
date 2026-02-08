@@ -73,8 +73,18 @@ def run_simulation(sim_input: SimulationInput) -> tuple:
 
 
 def process_result(sim_result: tuple):
-    t, y, stiff_force, t_decoupling = sim_result
+    f_out, (t, y, stiff_force, t_decoupling) = sim_result
     lv_r, lv_v, sc_r, sc_v = np.vsplit(y, 4)
+    rel_r = la.norm(lv_r - sc_r, axis=0)
+    rel_v = la.norm(lv_v - sc_v, axis=0)
+
+    # Печать в csv-файл
+    res_keys = ['time',
+                'lv Rx', 'lv Ry', 'lv Rz', 'lv Vx', 'lv Vy', 'lv Vz',
+                'sc Rx', 'sc Ry', 'sc Rz', 'sc Vx', 'sc Vy', 'sc Vz',
+                'rel dist', 'rel vel', 'stiff force']
+    res_values = list(np.vstack((t, y, rel_r, rel_v, stiff_force)).T)
+    utils.print_results(f_out, [dict(zip(res_keys, col)) for col in res_values])
 
     # Линейная экстраполяция для получения референсных прямых для проекций вектора скорости
     i0 = np.argwhere(t > 2 * t_decoupling).ravel()[0]
@@ -112,9 +122,6 @@ def process_result(sim_result: tuple):
                                     (r'$\bf v\it_x^I$, м/сек', r'$\bf v\it_y^I$, м/сек', r'$\bf v\it_z^I$, м/сек',
                                      r'$\bf v\it_x^I$, м/сек', r'$\bf v\it_y^I$, м/сек', r'$\bf v\it_z^I$, м/сек'))
 
-    # Графики отн. расстояния и скорости, а также силы пружинного толкателя
-    rel_r = la.norm(lv_r - sc_r, axis=0)
-    rel_v = la.norm(lv_v - sc_v, axis=0)
     utils.plot_vector(t[:i0 + 1], np.vstack((rel_r, rel_v, stiff_force))[:, :i0 + 1],
                       'Относительное расстояние, скорость и сила пружинного толкателя',
                       ('Отн. расстояние между РН и КА', 'Отн. скорость между РН и КА', 'Сила пружинного толкателя'),

@@ -21,6 +21,13 @@ def read_initial_conditions(filename) -> dict:
     return ic_dict
 
 
+def print_results(filename: str, results: list[dict]):
+    with open(filename, mode='w', newline='') as file:
+        csv_writer = csv.DictWriter(file, fieldnames=list(results[0].keys()), delimiter=';')
+        csv_writer.writeheader()
+        csv_writer.writerows(results)
+
+
 def get_with_length(vector: np.ndarray, length: float) -> np.ndarray:
     return vector / la.norm(vector) * length
 
