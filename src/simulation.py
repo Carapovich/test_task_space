@@ -123,7 +123,4 @@ def process_result(sim_result: tuple):
 
     # Пространственный график траектории
     fig = plt.figure(num='Траектории РН и КА в пространстве')
-    utils.plot_vehicles_trajectory(fig, t, y)
-    fig.tight_layout()
-
-    plt.show()
+    utils.show_anim(fig, utils.plot_vehicles_trajectory, 20, t, y)

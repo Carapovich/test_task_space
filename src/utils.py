@@ -8,6 +8,7 @@ import numpy.linalg as la
 from matplotlib.animation import FuncAnimation
 from matplotlib.artist import Artist
 from matplotlib.figure import Figure
+from matplotlib.widgets import Button
 from mpl_toolkits.mplot3d import Axes3D
 
 def read_initial_conditions(filename) -> dict:
@@ -193,26 +194,68 @@ def draw_together(axes: Axes3D, rv_vecs: np.ndarray):
     axes.quiver(*v2_r, *(2 * draw_together.lim_diff * -v2_r / la.norm(v2_r)), color='black')
     axes.quiver(*v2_r, *(2 * draw_together.lim_diff * v2_v / la.norm(v2_v)), color='red')
 
-def show_anim(func_draw: Callable, func_arg: list):
-    if not hasattr(show_anim, 'fig'):
-        show_anim.fig = plt.figure()
-    if not hasattr(show_anim, 'axes'):
-        show_anim.axes = show_anim.fig.add_subplot(111, projection='3d')
 
-    show_anim.fig.tight_layout()
-    total_frames = len(func_arg)
+def show_anim(figure: Figure, func_draw: Callable, frame_hz, t, y):
+    anim = FuncAnimation
+    anim_paused = True
+    cur_frame = 0
+    total_frames = int((t[-1] - t[0]) * frame_hz) + 1
+    rel_hz = int(1. / (t[1] - t[0]) / frame_hz)
 
     def anim_update(frame) -> Iterable[Artist]:
-        show_anim.axes.clear()
-        func_draw(show_anim.axes, func_arg[frame])
-        if frame == total_frames - 1:
-            anim.event_source.stop()
+        nonlocal anim_paused, cur_frame
 
-    anim = FuncAnimation(
-        show_anim.fig, anim_update,
-        frames=total_frames,
-        interval=50,
-        blit=False,
-        repeat=False
-    )
+        func_draw(figure, t, y, rel_hz * cur_frame)
+        if cur_frame == total_frames - 1:
+            cur_frame, anim_paused = 0, True
+            anim.event_source.stop()
+        else:
+            cur_frame += 1
+
+    def stop_and_redraw(new_cur_frame):
+        nonlocal anim_paused, cur_frame
+
+        anim_paused = True
+        anim.event_source.stop()
+        cur_frame = np.clip(new_cur_frame, 0, total_frames - 1)
+        func_draw(figure, t, y, rel_hz * cur_frame)
+        buttons[2].label.set_text(buttons_labels[2])
+        plt.draw()
+
+    def on_button_play_clicked(event):
+        nonlocal anim, anim_paused, cur_frame, rel_hz
+
+        if anim_paused:
+            anim_paused = False
+            if cur_frame == total_frames - 1:
+                cur_frame = 0
+
+            anim = FuncAnimation(
+                figure, anim_update,
+                frames=total_frames - cur_frame,
+                interval=50,
+                blit=False,
+                repeat=False
+            )
+            buttons[2].label.set_text(buttons_labels[-1])
+            plt.draw()
+        else:
+            stop_and_redraw(cur_frame)
+
+    buttons_h_pos = (0.450, 0.475, 0.500, 0.525, 0.550)
+    buttons_labels = ['⏮', '', '▶', '', '⏭', '']
+    buttons_labels_v_align = ['center', 'center_baseline', 'center_baseline', 'center_baseline', 'center']
+    buttons: list[Button] = []
+
+    for h_pos, label, v_align in zip(buttons_h_pos, buttons_labels, buttons_labels_v_align):
+        buttons.append(Button(figure.add_axes((h_pos, 0.01, 0.02, 0.04)), label))
+        buttons[-1].label.set(fontfamily="Segoe UI Symbol", fontsize=16, verticalalignment=v_align)
+
+    buttons[0].on_clicked(lambda e: stop_and_redraw(0))
+    buttons[1].on_clicked(lambda e: stop_and_redraw(cur_frame - 1))
+    buttons[2].on_clicked(on_button_play_clicked)
+    buttons[3].on_clicked(lambda e: stop_and_redraw(cur_frame + 1))
+    buttons[4].on_clicked(lambda e: stop_and_redraw(total_frames - 1))
+
+    func_draw(figure, t, y, rel_hz * cur_frame)
     plt.show()
