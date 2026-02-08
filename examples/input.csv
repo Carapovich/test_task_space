@@ -1,15 +1,15 @@
-semi major;6700;;km
-eccentricity;0.003;;
-arg periapsis;30;;deg
-long ascend;-15;;deg
-inclination;80;;deg
-mean anomaly;0;;deg
-spring k;30000;;N/m
-spring l0;220;;mm
-spring l2;110;;mm
-spring l1;195;;mm
-start yaw;0;;deg
-start pitch;0;;deg
-mass lv;3500;;kg
-mass sc;3100;;kg
-sim time;5;;sec
+semi major;6700;km
+eccentricity;0.003;
+arg periapsis;30;deg
+long ascend;-15;deg
+inclination;80;deg
+mean anomaly;0;deg
+spring k;30000;N/m
+spring l0;220;mm
+spring l2;110;mm
+spring l1;195;mm
+start yaw;0;deg
+start pitch;0;deg
+mass lv;3500;kg
+mass sc;3100;kg
+sim time;5;sec
