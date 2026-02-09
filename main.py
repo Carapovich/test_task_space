@@ -24,11 +24,11 @@ def parse_arguments():
 
 def main():
     args = parse_arguments()
-    input_dict = utils.read_initial_conditions(args.input)
 
+    input_dict = utils.read_input(args.input)
     sim_input = sim.SimulationInput.from_dict(input_dict)
     sim_result = sim.run_simulation(sim_input)
-    sim.process_result((args.output, sim_result))
+    sim.process_result((args.output, *sim_result))
 
     return 0
 

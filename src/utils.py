@@ -10,7 +10,7 @@ from matplotlib.widgets import Button
 from mpl_toolkits.mplot3d import Axes3D
 
 
-def read_initial_conditions(filename: str) -> dict[str, float]:
+def read_input(filename: str) -> dict[str, float]:
     with open(filename, mode='r', newline='') as file:
         ic_dict: dict[str, float] = {}
         csv_reader = csv.reader(file, delimiter=';')
@@ -27,8 +27,8 @@ def print_results(filename: str, results: list[dict]):
         csv_writer.writerows(results)
 
 
-def plot_vector(time: np.ndarray, vector_data, plot_name: str, titles: tuple, y_labels: tuple,
-                subplot_order=None, single_scale_y=True, add_plotting: Callable = None, args=None):
+def plot_vector(time: np.ndarray, vector_data, plot_name: str, titles: list[str], y_labels: list[str],
+                subplot_order: tuple[int, int] = None, single_scale_y=True, add_plotting: Callable = None, args=None):
     fig = plt.figure(num=plot_name)
     fig.suptitle(plot_name)
     plt.subplots_adjust(wspace=0.3, hspace=0.4)
@@ -59,7 +59,7 @@ def plot_vector(time: np.ndarray, vector_data, plot_name: str, titles: tuple, y_
 
 
 def plot_vector_with_ref_line(time: np.ndarray, vector_data, ref_t: np.ndarray, ref_y,
-                              plot_name: str, titles: tuple, y_labels: tuple):
+                              plot_name: str, titles: list[str], y_labels: list[str]):
 
     def plot_ref_line(axes, i, j, t, y):
         axes.plot(t, y[i][j, :], ls='--', color='black', linewidth=1, zorder=0)
@@ -71,7 +71,8 @@ def plot_vector_with_ref_line(time: np.ndarray, vector_data, ref_t: np.ndarray, 
     plot_vector(time, vector_data, plot_name, titles, y_labels, add_plotting=plot_ref_line, args=(ref_t, ref_y))
 
 
-def plot_bias(axes: Axes3D, point: np.ndarray, labels: tuple[str, str, str], mult=1.):
+def plot_bias(axes: Axes3D, point: np.ndarray,
+              labels: tuple[str, str, str] = (r'$x_I$', r'$y_I$', r'$z_I$'), mult: float = 1.):
     bias_3d = np.identity(3) * mult
     bias_3d += point
 
@@ -80,7 +81,7 @@ def plot_bias(axes: Axes3D, point: np.ndarray, labels: tuple[str, str, str], mul
         axes.text(*bias_3d[i, :], lbl, fontsize=12)
 
 
-def plot_vehicles_trajectory(figure: Figure, t: np.ndarray, vehicles_vectors: np.ndarray, frame=None):
+def plot_vehicles_trajectory(figure: Figure, t: np.ndarray, vehicles_vectors: np.ndarray, frame: int = None):
 
     def get_geom_anchors(vectors: np.ndarray) -> tuple:
         max_v, min_v = np.max(vectors, axis=1), np.min(vectors, axis=1)
@@ -107,7 +108,7 @@ def plot_vehicles_trajectory(figure: Figure, t: np.ndarray, vehicles_vectors: np
             ylim=(cntr[1] - d_lims[1], cntr[1] + d_lims[1]),
             zlim=(cntr[2] - d_lims[2], cntr[2] + d_lims[2]),
             box_aspect=(v_max - v_min) / d_lim_max, xlabel='X, метры', ylabel='Y, метры', zlabel='Z, метры')
-        plot_bias(axes_general, v_min + 1e-3 * d_lim_max, (r'$x_I$', r'$y_I$', r'$z_I$'), 0.05 * d_lim_max)
+        plot_bias(axes_general, v_min + 1e-3 * d_lim_max, mult=0.05 * d_lim_max)
 
         # Добавление фигур на график общего вида
         plot_vehicles_trajectory.figures_gnrl = [
@@ -129,11 +130,11 @@ def plot_vehicles_trajectory(figure: Figure, t: np.ndarray, vehicles_vectors: np
     point1._offsets3d = tuple(np.split(v1_r[:, frame], 3))
     point2._offsets3d = tuple(np.split(v2_r[:, frame], 3))
 
-    # Отрисовываем график приближенного вида
-    d_lim = plot_vehicles_trajectory.d_lim
     v1_r, v1_v, v2_r, v2_v = np.split(vehicles_vectors[:, frame], 4)
     _, v_min, _, _, cntr = get_geom_anchors(np.vstack((v1_r, v2_r)).T)
 
+    # Настраиваем и отрисовываем график приближенного вида
+    d_lim = plot_vehicles_trajectory.d_lim
     axes = plot_vehicles_trajectory.axes_closeup
     axes.clear()
     axes.set(
@@ -143,7 +144,7 @@ def plot_vehicles_trajectory(figure: Figure, t: np.ndarray, vehicles_vectors: np
         zlim=(cntr[2] - d_lim, cntr[2] + d_lim),
         box_aspect=(1, 1, 1), xlabel='X, метры', ylabel='Y, метры', zlabel='Z, метры')
 
-    plot_bias(axes, cntr - 0.95 * d_lim, (r'$x_I$', r'$y_I$', r'$z_I$'), 0.2 * d_lim)
+    plot_bias(axes, cntr - 0.95 * d_lim, mult=0.2 * d_lim)
     axes.scatter(*v1_r, color='k', marker='*', s=50)
     axes.text(*(v1_r + 1e-2 * d_lim), s='РН')
     axes.scatter(*v2_r, color='r', marker='*', s=50)
@@ -154,20 +155,15 @@ def plot_vehicles_trajectory(figure: Figure, t: np.ndarray, vehicles_vectors: np
     axes.text(*(v2_r + get_with_length(v2_v, 0.2 * d_lim) + 1e-2 * d_lim), s=rf'$\bf |v|$={la.norm(v2_v):.2f} м/с')
 
 
-def show_anim(figure: Figure, func_draw: Callable, frame_freq: float, t: np.ndarray, y: np.ndarray):
-    anim = FuncAnimation
-    anim_paused = True
-    current_frame = 0
-    total_frames = int((t[-1] - t[0]) * frame_freq) + 1
-    # Отношение частоты печати выходных данных к частоте кадров анимации
-    freq_relation = int(1. / (t[1] - t[0]) / frame_freq)
+def show_anim(figure: Figure, func_draw: Callable, frame_freq: float, t: np.ndarray, *args):
 
     def anim_update(frame):
         nonlocal anim_paused, current_frame
 
-        func_draw(figure, t, y, freq_relation * current_frame)
+        func_draw(figure, t, *args, freq_relation * current_frame)
         if current_frame == total_frames - 1:
-            current_frame, anim_paused = 0, True
+            current_frame = 0
+            anim_paused = True
             anim.event_source.stop()
         else:
             current_frame += 1
@@ -179,7 +175,7 @@ def show_anim(figure: Figure, func_draw: Callable, frame_freq: float, t: np.ndar
         anim.event_source.stop()
         current_frame = np.clip(new_cur_frame, 0, total_frames - 1)
 
-        func_draw(figure, t, y, freq_relation * current_frame)
+        func_draw(figure, t, *args, freq_relation * current_frame)
         # Замена значка на "воспроизведение"
         buttons[2].label.set_text(buttons_labels[2])
         plt.draw()
@@ -208,6 +204,14 @@ def show_anim(figure: Figure, func_draw: Callable, frame_freq: float, t: np.ndar
         else:
             stop_and_redraw(current_frame)
 
+    anim = FuncAnimation
+    anim_paused = True
+
+    total_frames = int((t[-1] - t[0]) * frame_freq) + 1
+    current_frame = total_frames - 1
+    # Отношение частоты печати выходных данных к частоте печати кадров анимации
+    freq_relation = int(1. / (t[1] - t[0]) / frame_freq)
+
     buttons_h_pos = (0.450, 0.475, 0.500, 0.525, 0.550)
     buttons_labels = ['⏮', '', '▶', '', '⏭', '']
     buttons_labels_v_align = ['center', 'center_baseline', 'center_baseline', 'center_baseline', 'center']
@@ -228,5 +232,5 @@ def show_anim(figure: Figure, func_draw: Callable, frame_freq: float, t: np.ndar
         button.set_active(False)
     buttons[2].set_active(True)
 
-    func_draw(figure, t, y, freq_relation * current_frame)
+    func_draw(figure, t, *args, freq_relation * current_frame)
     plt.show()

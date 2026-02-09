@@ -79,8 +79,8 @@ def run_simulation(sim_input: SimulationInput) -> tuple[np.ndarray, np.ndarray, 
     return t_eval, result.y, stiff_force, result.t_events[0][0]
 
 
-def process_result(sim_result: tuple[str, tuple[np.ndarray, np.ndarray, np.ndarray, float]]):
-    f_out, (t, y, stiff_force, t_decoupling) = sim_result
+def process_result(sim_result: tuple):
+    f_out, t, y, stiff_force, t_decoupling = sim_result
     lv_r, lv_v, sc_r, sc_v = np.vsplit(y, 4)
     rel_r = la.norm(lv_r - sc_r, axis=0)
     rel_v = la.norm(lv_v - sc_v, axis=0)
@@ -104,35 +104,35 @@ def process_result(sim_result: tuple[str, tuple[np.ndarray, np.ndarray, np.ndarr
     # Печати графиков
     utils.plot_vector(t, [lv_r, lv_v],
                       'Проекции радиус-вектора и вектора скорости РН в ECI J2000',
-                      (r'Проекция радиус-вектора $\bf r\it_x$', r'Проекция радиус-вектора $\bf r\it_y$',
+                      [r'Проекция радиус-вектора $\bf r\it_x$', r'Проекция радиус-вектора $\bf r\it_y$',
                        r'Проекция радиус-вектора $\bf r\it_z$',
                        r'Проекция вектора скорости $\bf v\it_x$', r'Проекция вектора скорости $\bf v\it_y$',
-                       r'Проекция вектора скорости $\bf v\it_z$'),
-                      (r'$\bf r\it_x^I$, метры', r'$\bf r\it_y^I$, метры', r'$\bf r\it_z^I$, метры',
-                       r'$\bf v\it_x^I$, м/сек', r'$\bf v\it_y^I$, м/сек', r'$\bf v\it_z^I$, м/сек'))
+                       r'Проекция вектора скорости $\bf v\it_z$'],
+                      [r'$\bf r\it_x^I$, метры', r'$\bf r\it_y^I$, метры', r'$\bf r\it_z^I$, метры',
+                       r'$\bf v\it_x^I$, м/сек', r'$\bf v\it_y^I$, м/сек', r'$\bf v\it_z^I$, м/сек'])
 
     utils.plot_vector(t, [sc_r, sc_v],
                       'Проекции радиус-вектора и вектора скорости КА в ECI J2000',
-                      (r'Проекция радиус-вектора $\bf r\it_x$', r'Проекция радиус-вектора $\bf r\it_y$',
+                      [r'Проекция радиус-вектора $\bf r\it_x$', r'Проекция радиус-вектора $\bf r\it_y$',
                        r'Проекция радиус-вектора $\bf r\it_z$',
                        r'Проекция вектора скорости $\bf v\it_x$', r'Проекция вектора скорости $\bf v\it_y$',
-                       r'Проекция вектора скорости $\bf v\it_z$'),
-                      (r'$\bf r\it_x^I$, метры', r'$\bf r\it_y^I$, метры', r'$\bf r\it_z^I$, метры',
-                       r'$\bf v\it_x^I$, м/сек', r'$\bf v\it_y^I$, м/сек', r'$\bf v\it_z^I$, м/сек'))
+                       r'Проекция вектора скорости $\bf v\it_z$'],
+                      [r'$\bf r\it_x^I$, метры', r'$\bf r\it_y^I$, метры', r'$\bf r\it_z^I$, метры',
+                       r'$\bf v\it_x^I$, м/сек', r'$\bf v\it_y^I$, м/сек', r'$\bf v\it_z^I$, м/сек'])
 
     utils.plot_vector_with_ref_line(t[:i0 + 1], [lv_v[:, :i0 + 1], sc_v[:, :i0 + 1]], ref_t, [ref_lv_v, ref_sc_v],
                                     r'Проекции вектора скорости РН и КА в ECI J2000 на начальном этапе моделирования',
-                                    (r'Проекция $\bf v\it_x$ РН', r'Проекция $\bf v\it_y$ РН',
+                                    [r'Проекция $\bf v\it_x$ РН', r'Проекция $\bf v\it_y$ РН',
                                      r'Проекция $\bf v\it_z$ РН',
                                      r'Проекция $\bf v\it_x$ КА', r'Проекция $\bf v\it_y$ КА',
-                                     r'Проекция $\bf v\it_z$ КА'),
-                                    (r'$\bf v\it_x^I$, м/сек', r'$\bf v\it_y^I$, м/сек', r'$\bf v\it_z^I$, м/сек',
-                                     r'$\bf v\it_x^I$, м/сек', r'$\bf v\it_y^I$, м/сек', r'$\bf v\it_z^I$, м/сек'))
+                                     r'Проекция $\bf v\it_z$ КА'],
+                                    [r'$\bf v\it_x^I$, м/сек', r'$\bf v\it_y^I$, м/сек', r'$\bf v\it_z^I$, м/сек',
+                                     r'$\bf v\it_x^I$, м/сек', r'$\bf v\it_y^I$, м/сек', r'$\bf v\it_z^I$, м/сек'])
 
     utils.plot_vector(t, np.vstack((rel_r, rel_v, stiff_force)),
                       'Относительное расстояние, скорость и сила пружинного толкателя',
-                      ('Отн. расстояние между РН и КА', 'Отн. скорость между РН и КА', 'Сила пружинного толкателя'),
-                      (r'$\bf |r|\it_{отн}$, метры', r'$\bf |v|\it_{отн}$, м/сек', r'$\bf F\it_{упр}$, Н'),
+                      ['Отн. расстояние между РН и КА', 'Отн. скорость между РН и КА', 'Сила пружинного толкателя'],
+                      [r'$\bf |r|\it_{отн}$, метры', r'$\bf |v|\it_{отн}$, м/сек', r'$\bf F\it_{упр}$, Н'],
                       subplot_order=(3, 1), single_scale_y=False)
 
     fig = plt.figure(num='Траектории РН и КА в пространстве')
