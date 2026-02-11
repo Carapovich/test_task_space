@@ -14,11 +14,6 @@ import scipy.integrate as integrator
 import src.core as core
 import src.utils as utils
 
-# Частота печати в файл в Гц
-PRINT_FREQUENCY = 100
-# Частота кадров анимации на пространственном графике траекторий тел в Гц
-ANIM_FREQUENCY = 20
-
 
 class SimulationInput:
     """
@@ -48,8 +43,8 @@ class SimulationInput:
     - ``sim_time``          --> Продолжительность моделирования (секунды)
     """
 
-    def __init__(self,
-                 a, e, periapsis, long, i, m0, spr_k, spr_l0, spr_l1, spr_l2, yaw, pitch, mass_lv, mass_sc, sim_time):
+    def __init__(self, a, e, periapsis, long, i, m0, spr_k, spr_l0, spr_l1, spr_l2,
+                 yaw, pitch, mass_lv, mass_sc, sim_time, print_freq, anim_freq):
         self.semi_major = a
         self.eccentricity = e
         self.arg_periapsis = periapsis
@@ -65,6 +60,8 @@ class SimulationInput:
         self.mass_lv = mass_lv
         self.mass_sc = mass_sc
         self.sim_time = sim_time
+        self.print_frequency = print_freq
+        self.anim_frequency = anim_freq
 
     @classmethod
     def from_dict(cls, d: dict):
@@ -83,7 +80,9 @@ class SimulationInput:
             pitch=np.radians(d['start pitch']),
             mass_lv=d['mass lv'],
             mass_sc=d['mass sc'],
-            sim_time=d['sim time']
+            sim_time=d['sim time'],
+            print_freq=d['print freq'],
+            anim_freq=d['anim freq']
         )
 
 
@@ -92,7 +91,7 @@ class SimulationOutput:
     Класс-контейнер (структура) для хранения результатов моделирования
     """
 
-    def __init__(self, t, lv_r, lv_v, sc_r, sc_v, rel_r, rel_v, f_s, t_decoupling):
+    def __init__(self, t, lv_r, lv_v, sc_r, sc_v, rel_r, rel_v, f_s, t_decoupling, anim_freq):
         self.timestamps = t
         """ Массив моментов времени, для которых рассчитано решение задачи моделирования (сек.) """
         self.lv_r = lv_r
@@ -111,6 +110,8 @@ class SimulationOutput:
         """ Массив решений сил пружинного толкателя от времени (Н) """
         self.time_decoupling = t_decoupling
         """ Момент времени, в который произошло отделение КА от РН (сек.) """
+        self.anim_frequency = anim_freq
+        """ Частота печати результатов моделирования в анимации """
 
     def __iter__(self):
         return iter(np.vstack((
@@ -154,7 +155,7 @@ def run_simulation(sim_input: SimulationInput) -> SimulationOutput:
 
     # Настройка параметров и расчет решения системы ДУ движения
     spring: dict = {"k": sim_input.spring_stiffness, "l0": sim_input.spring_l0, "l1": sim_input.spring_l1}
-    t_eval = np.linspace(start=0., stop=sim_input.sim_time, num=int(PRINT_FREQUENCY * sim_input.sim_time + 1))
+    t_eval = np.linspace(start=0., stop=sim_input.sim_time, num=int(sim_input.print_frequency * sim_input.sim_time + 1))
     result = integrator.solve_ivp(core.motion_equation_rhs,
                                   t_span=(t_eval[0], t_eval[-1]),
                                   y0=np.vstack((state_lv, state_sc)).ravel(),
@@ -181,7 +182,8 @@ def run_simulation(sim_input: SimulationInput) -> SimulationOutput:
         rel_r=rel_r,
         rel_v=rel_v,
         f_s=stiff_force,
-        t_decoupling=result.t_events[0][0]
+        t_decoupling=result.t_events[0][0],
+        anim_freq=sim_input.anim_frequency
     )
 
 
@@ -254,4 +256,4 @@ def process_result(sim_out: SimulationOutput, filename_csv: str):
 
     fig = plt.figure(num='Траектории РН и КА в пространстве')
     results_states = np.vstack((sim_out.lv_r, sim_out.lv_v, sim_out.sc_r, sim_out.sc_v))
-    utils.show_anim(fig, utils.plot_vehicles_trajectory, ANIM_FREQUENCY, sim_out.timestamps, results_states)
+    utils.show_anim(fig, utils.plot_vehicles_trajectory, sim_out.anim_frequency, sim_out.timestamps, results_states)
