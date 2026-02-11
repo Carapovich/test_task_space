@@ -40,7 +40,7 @@ def main():
     sim_result = sim.run_simulation(sim_input)
 
     # Вывод результата
-    sim.process_result((args.output, *sim_result))
+    sim.process_result(sim_result, args.output)
 
     return 0
 

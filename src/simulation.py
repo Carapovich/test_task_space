@@ -87,7 +87,42 @@ class SimulationInput:
         )
 
 
-def run_simulation(sim_input: SimulationInput) -> tuple[np.ndarray, np.ndarray, np.ndarray, float]:
+class SimulationOutput:
+    """
+    Класс-контейнер (структура) для хранения результатов моделирования
+    """
+
+    def __init__(self, t, lv_r, lv_v, sc_r, sc_v, rel_r, rel_v, f_s, t_decoupling):
+        self.timestamps = t
+        """ Массив моментов времени, для которых рассчитано решение задачи моделирования (сек.) """
+        self.lv_r = lv_r
+        """ Массив решений радиус-векторов РН от времени (метры) """
+        self.lv_v = lv_v
+        """ Массив решений векторов скорости РН от времени (м/сек) """
+        self.sc_r = sc_r
+        """ Массив решений радиус-векторов КА от времени (метры) """
+        self.sc_v = sc_v
+        """ Массив решений векторов скорости КА от времени (м/сек) """
+        self.rel_r = rel_r
+        """ Массив решений относительных расстояний между РН и КА (метры) """
+        self.rel_v = rel_v
+        """ Массив решений относительных скоростей между РН и КА (метры) """
+        self.stiff_forces = f_s
+        """ Массив решений сил пружинного толкателя от времени (Н) """
+        self.time_decoupling = t_decoupling
+        """ Момент времени, в который произошло отделение КА от РН (сек.) """
+
+    def __iter__(self):
+        return iter(np.vstack((
+            self.timestamps,
+            self.lv_r, self.lv_v,
+            self.sc_r, self.sc_v,
+            self.rel_r, self.rel_v,
+            self.stiff_forces
+        )).T)
+
+
+def run_simulation(sim_input: SimulationInput) -> SimulationOutput:
     """
     Рассчитывает задачу моделирования динамики отделения КА от ступени РН
     по входным данным и возвращает требуемые результаты моделирования
@@ -100,21 +135,16 @@ def run_simulation(sim_input: SimulationInput) -> tuple[np.ndarray, np.ndarray, 
     На втором этапе рассчитывает решение системы ОДУ динамики и кинематики
     поступательного движения аппаратов методом Рунге-Кутты 4-го порядка в
     указанные моменты времени по начальным условиям, рассчитанным на первом этапе. \n
-    На третьем этапе для целей печати рассчитывается временной закон силы
-    пружинного толкателя по полученным из решения ОДУ координатам РН и КА.
+    На третьем этапе рассчитываются:
+        - временной закон силы пружинного толкателя,
+        - относительное расстояние между РН и КА,
+        - относительная скорость между РН и КА,
+    по полученным из решения ОДУ радиус-векторам и векторам скорости аппаратов.
 
     ----------------
 
     :param sim_input: Входные данные задачи моделирования в виде класса-контейнера
-
-    Returns
-    ----------------
-    Кортеж содержащий:
-        1. Массив моментов времени, для которых рассчитано решение задачи моделирования
-        2. Матрица решения ОДУ динамики и кинематики аппаратов (рад-вектор РН, вектор скорости РН, то же самое для КА)
-        3. Массив значений силы пружинного толкателя в возвращаемые ранее моменты времени
-        4. Момент времени расстыковки РН и КА (по условию превышения расстояния между РН и КА значения конечной длины
-           пружины)
+    :return: Результаты решения задачи моделирования в виде класса-контейнера
     """
     # Задание начальных координат и скоростей РН и КА
     state_lv = core.kepler2eci(sim_input.semi_major, sim_input.eccentricity, sim_input.inclination,
@@ -133,15 +163,29 @@ def run_simulation(sim_input: SimulationInput) -> tuple[np.ndarray, np.ndarray, 
                                   events=core.event_decoupling,
                                   args=(spring, sim_input.mass_lv, sim_input.mass_sc, e_lv2sc))
 
-    # Расчет динамики силы пружинного толкателя на печать
-    rel_r = la.norm(result.y[:3, :] - result.y[6:9, :], axis=0)
+    # Расчет относительного расстояния и скорости между РН и КА от времени
+    lv_r, lv_v, sc_r, sc_v = np.vsplit(result.y, 4)
+    rel_r = la.norm(lv_r - sc_r, axis=0)
+    rel_v = la.norm(lv_v - sc_v, axis=0)
+
+    # Расчет динамики силы пружинного толкателя  от времени
     dx = np.where(rel_r >= spring['l1'], spring['l0'], rel_r)
     stiff_force = spring["k"] * (spring["l0"] - dx)
 
-    return t_eval, result.y, stiff_force, result.t_events[0][0]
+    return SimulationOutput(
+        t=t_eval,
+        lv_r=lv_r,
+        lv_v=lv_v,
+        sc_r=sc_r,
+        sc_v=sc_v,
+        rel_r=rel_r,
+        rel_v=rel_v,
+        f_s=stiff_force,
+        t_decoupling=result.t_events[0][0]
+    )
 
 
-def process_result(sim_result: tuple):
+def process_result(sim_out: SimulationOutput, filename_csv: str):
     """
     Печает результаты моделирования динамики отделения КА от ступени РН в виде:
         - csv-файла,
@@ -151,21 +195,9 @@ def process_result(sim_result: tuple):
 
     ----------------
 
-    :param sim_result: Кортеж, содержащий:
-        1. Путь до csv-файла с результатами моделирования;
-        2. Массив моментов времени, для которых рассчитано решение задачи моделирования
-        3. Матрица решения ОДУ динамики и кинематики аппаратов (рад-вектор РН, вектор скорости РН, то же самое для КА)
-        4. Массив значений силы пружинного толкателя в возвращаемые ранее моменты времени
-        5. Момент времени расстыковки РН и КА (по условию превышения расстояния между РН и КА значения конечной длины
-           пружины)
+    :param sim_out: Результаты решения задачи моделирования в виде класса-контейнера
+    :param filename_csv: Путь к csv-файлу, в который печатаются результаты моделирования
     """
-    f_out, t, y, stiff_force, t_decoupling = sim_result
-    lv_r, lv_v, sc_r, sc_v = np.vsplit(y, 4)
-
-    # Относительные расстояния и скорости между РН и КА
-    rel_r = la.norm(lv_r - sc_r, axis=0)
-    rel_v = la.norm(lv_v - sc_v, axis=0)
-
     # Печать в csv-файл
     res_keys = [
         'time, с',
@@ -173,17 +205,20 @@ def process_result(sim_result: tuple):
         'sc Rx, м', 'sc Ry, м', 'sc Rz, м', 'sc Vx, м/с', 'sc Vy, м/с', 'sc Vz, м/с',
         'rel dist, м', 'rel vel, м/с', 'stiff force, Н'
     ]
-    res_values = list(np.vstack((t, y, rel_r, rel_v, stiff_force)).T)
-    utils.print_results(f_out, [dict(zip(res_keys, col)) for col in res_values])
+    utils.print_results(filename_csv, [dict(zip(res_keys, col)) for col in sim_out])
 
     # Линейная экстраполяция для получения опорных прямых для проекций вектора скорости на увеличенном графике
-    i0 = np.argwhere(t > 2. * t_decoupling).ravel()[0]
-    ref_lv_v = np.stack((lv_v[:, i0] - (lv_v[:, 2 * i0] - lv_v[:, i0]) / (t[2 * i0] - t[i0]) * t[i0], lv_v[:, i0])).T
-    ref_sc_v = np.stack((sc_v[:, i0] - (sc_v[:, 2 * i0] - sc_v[:, i0]) / (t[2 * i0] - t[i0]) * t[i0], sc_v[:, i0])).T
-    ref_t = t[[0, i0]]
+    i0 = np.argwhere(sim_out.timestamps > 2. * sim_out.time_decoupling).ravel()[0]
+    ref_lv_v = np.stack((sim_out.lv_v[:, i0] - (sim_out.lv_v[:, 2 * i0] - sim_out.lv_v[:, i0]) /
+                         (sim_out.timestamps[2 * i0] - sim_out.timestamps[i0]) * sim_out.timestamps[i0],
+                         sim_out.lv_v[:, i0])).T
+    ref_sc_v = np.stack((sim_out.sc_v[:, i0] - (sim_out.sc_v[:, 2 * i0] - sim_out.sc_v[:, i0]) /
+                         (sim_out.timestamps[2 * i0] - sim_out.timestamps[i0]) * sim_out.timestamps[i0],
+                         sim_out.sc_v[:, i0])).T
+    ref_t = sim_out.timestamps[[0, i0]]
 
     # Печати графиков
-    utils.plot_vector(t, [lv_r, lv_v],
+    utils.plot_vector(sim_out.timestamps, [sim_out.lv_r, sim_out.lv_v],
                       'Проекции радиус-вектора и вектора скорости РН в ECI J2000',
                       [r'Проекция радиус-вектора $\bf r\it_x$', r'Проекция радиус-вектора $\bf r\it_y$',
                        r'Проекция радиус-вектора $\bf r\it_z$',
@@ -192,7 +227,7 @@ def process_result(sim_result: tuple):
                       [r'$\bf r\it_x^I$, метры', r'$\bf r\it_y^I$, метры', r'$\bf r\it_z^I$, метры',
                        r'$\bf v\it_x^I$, м/сек', r'$\bf v\it_y^I$, м/сек', r'$\bf v\it_z^I$, м/сек'])
 
-    utils.plot_vector(t, [sc_r, sc_v],
+    utils.plot_vector(sim_out.timestamps, [sim_out.sc_r, sim_out.sc_v],
                       'Проекции радиус-вектора и вектора скорости КА в ECI J2000',
                       [r'Проекция радиус-вектора $\bf r\it_x$', r'Проекция радиус-вектора $\bf r\it_y$',
                        r'Проекция радиус-вектора $\bf r\it_z$',
@@ -201,7 +236,8 @@ def process_result(sim_result: tuple):
                       [r'$\bf r\it_x^I$, метры', r'$\bf r\it_y^I$, метры', r'$\bf r\it_z^I$, метры',
                        r'$\bf v\it_x^I$, м/сек', r'$\bf v\it_y^I$, м/сек', r'$\bf v\it_z^I$, м/сек'])
 
-    utils.plot_vector_with_ref_line(t[:i0 + 1], [lv_v[:, :i0 + 1], sc_v[:, :i0 + 1]], ref_t, [ref_lv_v, ref_sc_v],
+    utils.plot_vector_with_ref_line(sim_out.timestamps[:i0 + 1], [sim_out.lv_v[:, :i0 + 1], sim_out.sc_v[:, :i0 + 1]],
+                                    ref_t, [ref_lv_v, ref_sc_v],
                                     r'Проекции вектора скорости РН и КА в ECI J2000 на начальном этапе моделирования',
                                     [r'Проекция $\bf v\it_x$ РН', r'Проекция $\bf v\it_y$ РН',
                                      r'Проекция $\bf v\it_z$ РН',
@@ -210,11 +246,12 @@ def process_result(sim_result: tuple):
                                     [r'$\bf v\it_x^I$, м/сек', r'$\bf v\it_y^I$, м/сек', r'$\bf v\it_z^I$, м/сек',
                                      r'$\bf v\it_x^I$, м/сек', r'$\bf v\it_y^I$, м/сек', r'$\bf v\it_z^I$, м/сек'])
 
-    utils.plot_vector(t, np.vstack((rel_r, rel_v, stiff_force)),
+    utils.plot_vector(sim_out.timestamps, np.vstack((sim_out.rel_r, sim_out.rel_v, sim_out.stiff_forces)),
                       'Относительное расстояние, скорость и сила пружинного толкателя',
                       ['Отн. расстояние между РН и КА', 'Отн. скорость между РН и КА', 'Сила пружинного толкателя'],
                       [r'$\bf |r|\it_{отн}$, метры', r'$\bf |v|\it_{отн}$, м/сек', r'$\bf F\it_{упр}$, Н'],
                       subplot_order=(3, 1), single_scale_y=False)
 
     fig = plt.figure(num='Траектории РН и КА в пространстве')
-    utils.show_anim(fig, utils.plot_vehicles_trajectory, ANIM_FREQUENCY, t, y)
+    results_states = np.vstack((sim_out.lv_r, sim_out.lv_v, sim_out.sc_r, sim_out.sc_v))
+    utils.show_anim(fig, utils.plot_vehicles_trajectory, ANIM_FREQUENCY, sim_out.timestamps, results_states)
