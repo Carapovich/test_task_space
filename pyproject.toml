@@ -1,0 +1,18 @@
+[project]
+name = "test-task-space"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Khromenko",email = "nikitahromenko@mail.ru"}
+]
+requires-python = ">=3.12"
+dependencies = [
+    "numpy (>=2.4.2,<3.0.0)",
+    "scipy (>=1.17.0,<2.0.0)",
+    "matplotlib (>=3.10.8,<4.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
