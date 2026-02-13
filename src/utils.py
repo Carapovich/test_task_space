@@ -348,9 +348,7 @@ def show_anim(figure: Figure, func_draw: Callable, t: np.ndarray, *args):
 
         func_draw(figure, t, *args, current_frame)
         if current_frame == total_frames - 1:
-            current_frame = 0
-            anim_paused = True
-            anim.event_source.stop()
+            stop_and_redraw(current_frame)
         else:
             current_frame += 1
 
