@@ -251,6 +251,10 @@ def process_result(sim_out: SimulationOutput, filename_csv: str):
                       [r'$\bf |r|\it_{отн}$, метры', r'$\bf |v|\it_{отн}$, м/сек', r'$\bf F\it_{упр}$, Н'],
                       subplot_order=(3, 1), single_scale_y=False)
 
+    # Понижение частоты печати результатов моделирования для построения пространственного графика
+    freq_relation = int(1. / (sim_out.timestamps[1] - sim_out.timestamps[0]) / sim_out.anim_frequency)
+    timestamps = sim_out.timestamps[::freq_relation]
+    results_states = np.vstack((sim_out.lv_r, sim_out.lv_v, sim_out.sc_r, sim_out.sc_v))[:, ::freq_relation]
+
     fig = plt.figure(num='Траектории РН и КА в пространстве')
-    results_states = np.vstack((sim_out.lv_r, sim_out.lv_v, sim_out.sc_r, sim_out.sc_v))
-    utils.show_anim(fig, utils.plot_vehicles_trajectory, sim_out.anim_frequency, sim_out.timestamps, results_states)
+    utils.show_anim(fig, utils.plot_vehicles_trajectory, timestamps, results_states)

@@ -321,7 +321,7 @@ def plot_vehicles_trajectory(figure: Figure, t: np.ndarray, vehicles_vectors: np
     axes.text(*(v2_r + get_with_length(v2_v, 0.2 * d_lim) + 1e-2 * d_lim), s=rf'$\bf |v|$={la.norm(v2_v):.2f} м/с')
 
 
-def show_anim(figure: Figure, func_draw: Callable, frame_freq: float, t: np.ndarray, *args):
+def show_anim(figure: Figure, func_draw: Callable, t: np.ndarray, *args):
     """
     Настраивает анимацию и проигрыватель для нее в окне графиков ``figure``,
     используя для отрисовки кадра анимации функцию ``func_draw`` вида::
@@ -335,16 +335,10 @@ def show_anim(figure: Figure, func_draw: Callable, frame_freq: float, t: np.ndar
         - Переходить к ближайшему предыдущему/следующему кадру анимации
         - Переходить в начало конец анимации
 
-    Параметр ``frame_freq`` определяет количество кадров, выводящихся на секунду
-    времени, используя в качестве шкалы массив моментов времени ``t``. `Таким образом,
-    частота` ``frame_freq`` `не может быть выше частоты печати временной шкалы` ``t`` `.`
-    Параметр args определяет варьируемый список параметров функции отрисовки кадра.
-
     ----------------
 
     :param figure: Объект окна для вывода графиков
     :param func_draw: Функция отрисовки кадра анимации
-    :param frame_freq: Количество кадров, выводящихся на секунду временной шкалы ``t``
     :param t: Массив моментов времени (временная шкала)
     :param args: Варьируемые аргументы функции отрисовки
     """
@@ -352,7 +346,7 @@ def show_anim(figure: Figure, func_draw: Callable, frame_freq: float, t: np.ndar
     def anim_update(frame):
         nonlocal anim_paused, current_frame
 
-        func_draw(figure, t, *args, freq_relation * current_frame)
+        func_draw(figure, t, *args, current_frame)
         if current_frame == total_frames - 1:
             current_frame = 0
             anim_paused = True
@@ -368,7 +362,7 @@ def show_anim(figure: Figure, func_draw: Callable, frame_freq: float, t: np.ndar
         anim.event_source.stop()
         current_frame = np.clip(new_cur_frame, 0, total_frames - 1)
 
-        func_draw(figure, t, *args, freq_relation * current_frame)
+        func_draw(figure, t, *args, current_frame)
         # Замена значка на "воспроизведение"
         buttons[2].label.set_text(buttons_labels[2])
         plt.draw()
@@ -401,10 +395,8 @@ def show_anim(figure: Figure, func_draw: Callable, frame_freq: float, t: np.ndar
     anim = FuncAnimation
     anim_paused = True
 
-    total_frames = int((t[-1] - t[0]) * frame_freq) + 1
+    total_frames = t.size
     current_frame = total_frames - 1
-    # Отношение частоты печати выходных данных к частоте печати кадров анимации
-    freq_relation = int(1. / (t[1] - t[0]) / frame_freq)
 
     # Настройка проигрывателя в окне графиков
     buttons_h_pos = (0.450, 0.475, 0.500, 0.525, 0.550)
@@ -428,5 +420,5 @@ def show_anim(figure: Figure, func_draw: Callable, frame_freq: float, t: np.ndar
     buttons[2].set_active(True)
 
     # Первоначальная отрисовка (т.к. анимация на паузе)
-    func_draw(figure, t, *args, freq_relation * current_frame)
+    func_draw(figure, t, *args, current_frame)
     plt.show()
